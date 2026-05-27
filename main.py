@@ -1,7 +1,8 @@
 from anthropic import APIError, APITimeoutError, AuthenticationError, NotFoundError
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
-from claude_client import call_claude
+from claude_client import call_claude, stream_claude
 from models import PipelineRequest, PipelineResponse
 
 app = FastAPI(title="Claude Pipeline", version="0.1.0")
@@ -25,3 +26,26 @@ def pipeline(req: PipelineRequest):
         raise HTTPException(status_code=504, detail="Claude API 请求超时")
     except APIError as e:
         raise HTTPException(status_code=502, detail=f"Claude API 错误: {e.message}")
+
+
+@app.post("/pipeline/stream")
+def pipeline_stream(req: PipelineRequest):
+    def _generate():
+        try:
+            for token in stream_claude(req.prompt):
+                yield f"data: {token}\n\n"
+            yield "data: [DONE]\n\n"
+        except AuthenticationError:
+            yield "event: error\ndata: Claude API 认证失败，请检查 API Key\n\n"
+        except NotFoundError:
+            yield "event: error\ndata: 请求的模型不可用\n\n"
+        except APITimeoutError:
+            yield "event: error\ndata: Claude API 请求超时\n\n"
+        except APIError as e:
+            yield f"event: error\ndata: Claude API 错误: {e.message}\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"X-Model": stream_claude.model_name},
+    )
