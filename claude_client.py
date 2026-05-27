@@ -12,3 +12,6 @@ def call_claude(prompt: str) -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
+
+
+call_claude.model_name = settings.model_name
