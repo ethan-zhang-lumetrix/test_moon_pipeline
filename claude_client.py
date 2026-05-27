@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import anthropic
 
 from config import settings
@@ -15,3 +17,17 @@ def call_claude(prompt: str) -> str:
 
 
 call_claude.model_name = settings.model_name
+
+
+def stream_claude(prompt: str) -> Iterator[str]:
+    with _client.messages.stream(
+        model=settings.model_name,
+        max_tokens=settings.max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    ) as stream:
+        for event in stream:
+            if event.type == "content_block_delta":
+                yield event.delta.text
+
+
+stream_claude.model_name = settings.model_name
