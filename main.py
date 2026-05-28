@@ -1,8 +1,8 @@
 from anthropic import APIError, APITimeoutError, AuthenticationError, NotFoundError
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
-from claude_client import call_claude, stream_claude
+from claude_client import call_claude, check_health, stream_claude
 from models import PipelineRequest, PipelineResponse
 
 app = FastAPI(title="Claude Pipeline", version="0.1.0")
@@ -10,7 +10,9 @@ app = FastAPI(title="Claude Pipeline", version="0.1.0")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    result = check_health()
+    status_code = 200 if result["status"] == "healthy" else 503
+    return JSONResponse(content=result, status_code=status_code)
 
 
 @app.post("/pipeline", response_model=PipelineResponse)

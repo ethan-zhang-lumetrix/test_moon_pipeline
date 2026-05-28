@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 import anthropic
+from anthropic import APIStatusError, AuthenticationError
 
 from config import settings
 
@@ -31,3 +32,20 @@ def stream_claude(prompt: str) -> Iterator[str]:
 
 
 stream_claude.model_name = settings.model_name
+
+
+def check_health() -> dict:
+    """Check Claude API connectivity with a minimal call."""
+    try:
+        _client.messages.create(
+            model=settings.model_name,
+            max_tokens=1,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        return {"status": "healthy", "model": settings.model_name}
+    except AuthenticationError:
+        return {"status": "unhealthy", "reason": "认证失败"}
+    except anthropic.APIStatusError as e:
+        return {"status": "unhealthy", "reason": f"API 错误: {e.message}"}
+    except Exception as e:
+        return {"status": "unhealthy", "reason": str(e)}
