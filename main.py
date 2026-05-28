@@ -18,7 +18,7 @@ async def health():
 @app.post("/pipeline", response_model=PipelineResponse)
 def pipeline(req: PipelineRequest):
     try:
-        result = call_claude(req.prompt)
+        result = call_claude(req.prompt, req.max_tokens)
         return PipelineResponse(result=result, model=call_claude.model_name)
     except AuthenticationError:
         raise HTTPException(status_code=401, detail="Claude API 认证失败，请检查 API Key")
@@ -34,7 +34,7 @@ def pipeline(req: PipelineRequest):
 def pipeline_stream(req: PipelineRequest):
     def _generate():
         try:
-            for token in stream_claude(req.prompt):
+            for token in stream_claude(req.prompt, req.max_tokens):
                 yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"
         except AuthenticationError:
