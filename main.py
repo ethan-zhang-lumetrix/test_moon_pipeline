@@ -3,9 +3,9 @@ import traceback
 
 from anthropic import APIError, APITimeoutError, AuthenticationError, NotFoundError
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
-from claude_client import call_claude, stream_claude
+from claude_client import call_claude, check_health, stream_claude
 from logger import get_logger, setup_logging
 from models import PipelineRequest, PipelineResponse
 
@@ -32,13 +32,15 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    result = check_health()
+    status_code = 200 if result["status"] == "healthy" else 503
+    return JSONResponse(content=result, status_code=status_code)
 
 
 @app.post("/pipeline", response_model=PipelineResponse)
 def pipeline(req: PipelineRequest):
     try:
-        result = call_claude(req.prompt)
+        result = call_claude(req.prompt, req.max_tokens)
         return PipelineResponse(result=result, model=call_claude.model_name)
     except AuthenticationError:
         logger.error("auth failed\n%s", traceback.format_exc())
@@ -58,7 +60,7 @@ def pipeline(req: PipelineRequest):
 def pipeline_stream(req: PipelineRequest):
     def _generate():
         try:
-            for token in stream_claude(req.prompt):
+            for token in stream_claude(req.prompt, req.max_tokens):
                 yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"
         except AuthenticationError:
